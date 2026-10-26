@@ -175,3 +175,6 @@ cython_debug/
 
 # Screenshot saved by Download_Music/main.py
 result.png
+
+# macOS folder metadata
+.DS_Store
