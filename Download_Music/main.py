@@ -4,7 +4,7 @@ from pathlib import Path
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
-PAGE_URL = "https://the-site.com"
+PAGE_URL = "https://yt-to-mp3.net"
 
 HERE = Path(__file__).parent
 
