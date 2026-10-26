@@ -4,60 +4,64 @@ from pathlib import Path
 from mutagen.id3 import ID3, ID3NoHeaderError, TALB, TPE1
 
 
-def find_mp3s(target):
-    path = Path(target).expanduser()
-    if path.is_dir():
-        return sorted(path.glob("*.mp3"))
-    return [path]
-
-
 def read_tags(path):
     try:
-        tags = ID3(path)
+        return ID3(path)
     except ID3NoHeaderError:
-        return "", ""
-    artist = tags["TPE1"].text[0] if "TPE1" in tags else ""
-    album = tags["TALB"].text[0] if "TALB" in tags else ""
-    return artist, album
+        return ID3()
 
 
-def write_tags(path, artist=None, album=None):
-    try:
-        tags = ID3(path)
-    except ID3NoHeaderError:
-        tags = ID3()
+def first_text(tags, frame):
+    return tags[frame].text[0] if frame in tags else ""
 
-    if artist is not None:
+
+def tag_file(path, artist, album, dry_run):
+    tags = read_tags(path)
+    old_artist, old_album = first_text(tags, "TPE1"), first_text(tags, "TALB")
+    has_image = bool(tags.getall("APIC"))
+
+    if not dry_run:
         tags.setall("TPE1", [TPE1(encoding=3, text=artist)])
-    if album is not None:
         tags.setall("TALB", [TALB(encoding=3, text=album)])
-    tags.save(path)
+        tags.delall("APIC")
+        tags.save(path)
+
+    image_note = ", image removed" if has_image else ""
+    print(f"{path.name}: artist {old_artist!r} -> {artist!r}, album {old_album!r} -> {album!r}{image_note}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Set the artist and/or album of an .mp3 file, or of every .mp3 in a folder.")
-    parser.add_argument("target", help="An .mp3 file, or a folder of .mp3 files")
-    parser.add_argument("--artist", help="New artist (author) name")
-    parser.add_argument("--album", help="New album name")
+    parser = argparse.ArgumentParser(
+        description="Set each .mp3's artist and album from its folders (Artist/Album/song.mp3) and remove its cover image."
+    )
+    parser.add_argument("root", help="Folder that contains the artist folders")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would change without changing any file")
     args = parser.parse_args()
 
-    files = find_mp3s(args.target)
+    root = Path(args.root).expanduser()
+    if not root.is_dir():
+        raise SystemExit(f"Not a folder: {root}")
+
+    files = sorted(root.rglob("*.mp3"))
     if not files:
-        raise SystemExit(f"No .mp3 files found in {args.target}")
+        raise SystemExit(f"No .mp3 files found in {root}")
 
+    done, skipped = 0, []
     for path in files:
-        if not path.is_file():
-            raise SystemExit(f"Not found: {path}")
-
-    for path in files:
-        old_artist, old_album = read_tags(path)
-        if args.artist is None and args.album is None:
-            print(f"{path.name}: artist={old_artist!r} album={old_album!r}")
+        relative = path.relative_to(root)
+        if len(relative.parts) < 3:
+            skipped.append(relative)
             continue
 
-        write_tags(path, args.artist, args.album)
-        new_artist, new_album = read_tags(path)
-        print(f"{path.name}: artist {old_artist!r} -> {new_artist!r}, album {old_album!r} -> {new_album!r}")
+        album = path.parent.name.strip()
+        artist = path.parent.parent.name.strip()
+        tag_file(path, artist, album, args.dry_run)
+        done += 1
+
+    verb = "would be updated" if args.dry_run else "updated"
+    print(f"\n{done} file(s) {verb}.")
+    for relative in skipped:
+        print(f"Skipped (not inside Artist/Album folders): {relative}")
 
 
 if __name__ == "__main__":
