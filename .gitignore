@@ -178,3 +178,6 @@ result.png
 
 # macOS folder metadata
 .DS_Store
+
+# Music files
+*.mp3
