@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -47,6 +48,15 @@ def convert_and_download(browser, url, text, input_selector, button_selector, su
 
 
 def main():
+    # Filenames from the converter can contain characters the Windows
+    # console cannot print (e.g. emoji). Replace them when printing
+    # instead of crashing the whole run.
+    try:
+        sys.stdout.reconfigure(errors="replace")
+        sys.stderr.reconfigure(errors="replace")
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(description="Type each line of a text file into a page's input box, click its button, and download the result.")
     parser.add_argument("--url", default=PAGE_URL, help="Page to open (default: PAGE_URL at the top of this file)")
     parser.add_argument("--inputs", default=str(HERE / "inputs.txt"), help="Text file with one entry per line")
